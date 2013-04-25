@@ -140,6 +140,9 @@ class Store(BaseDocumentManager):
   STORE_LOCATION = 'store_location'
   STORE_ADDRESS = 'store_address'
 
+class FakeQuery():
+    """Protects against annoying failures"""
+    results = ()
 
 class Product(BaseDocumentManager):
   """Provides helper methods to manage Product documents.  All Product documents
@@ -309,15 +312,20 @@ class Product(BaseDocumentManager):
     try:
       sq = search.Query(
           query_string=query_string.strip())
-      search_results = cls.getIndex().search(sq)
+      search_results = FakeQuery()
+      try:
+        search_results = cls.getIndex().search(sq)
+      except:
+        pass
     except search.Error:
       logging.exception('An error occurred on search.')
       return None
 
     ratings_buckets = collections.defaultdict(int)
     # populate the buckets
-    for res in search_results:
-      ratings_buckets[int((cls(res)).getAvgRating() or 0)] += 1
+    if len(search_results.results):
+      for res in search_results:
+        ratings_buckets[int((cls(res)).getAvgRating() or 0)] += 1
     return ratings_buckets
 
   @classmethod

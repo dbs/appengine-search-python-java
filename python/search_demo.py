@@ -33,6 +33,9 @@ class BaseHandler(webapp2.RequestHandler):
     def render_template(self, filename, template_args):
       self.response.write(self.jinja2.render_template(filename, **template_args))
 
+class FakeRequest():
+    """Protects against annoying failures"""
+    results = ()
 
 class MainPage(BaseHandler):
     """Handles search requests for comments."""
@@ -56,7 +59,11 @@ class MainPage(BaseHandler):
             limit=3,
             sort_options=sort_opts)
         query_obj = search.Query(query_string=query, options=query_options)
-        results = search.Index(name=_INDEX_NAME).search(query=query_obj)
+        results = FakeRequest()
+        try:
+            results = search.Index(name=_INDEX_NAME).search(query=query_obj)
+        except Exception, e:
+            pass
         if users.get_current_user():
             url = users.create_logout_url(self.request.uri)
             url_linktext = 'Logout'

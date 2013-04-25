@@ -211,6 +211,10 @@ class CreateReviewHandler(BaseHandler):
       return review
     return ndb.transaction(_tx)
 
+class FakeQuery():
+    """Protects against annoying failures"""
+    results = ()
+    number_found = 0
 
 class ProductSearchHandler(BaseHandler):
   """The handler for doing a product search."""
@@ -291,7 +295,11 @@ class ProductSearchHandler(BaseHandler):
       # build the query and perform the search
       search_query = self._buildQuery(
           query, sortq, sort_dict, doc_limit, offsetval)
-      search_results = docs.Product.getIndex().search(search_query)
+      search_results = FakeQuery()
+      try:
+        search_results = docs.Product.getIndex().search(search_query)
+      except:
+        pass
       returned_count = len(search_results.results)
 
     except search.Error:
@@ -308,33 +316,34 @@ class ProductSearchHandler(BaseHandler):
     # cat_name = models.Category.getCategoryName(categoryq)
     psearch_response = []
     # For each document returned from the search
-    for doc in search_results:
-      # logging.info("doc: %s ", doc)
-      pdoc = docs.Product(doc)
-      # use the description field as the default description snippet, since
-      # snippeting is not supported on the dev app server.
-      description_snippet = pdoc.getDescription()
-      price = pdoc.getPrice()
-      # on the dev app server, the doc.expressions property won't be populated.
-      for expr in doc.expressions:
-        if expr.name == docs.Product.DESCRIPTION:
-          description_snippet = expr.value
-        # uncomment to use 'adjusted price', which should be
-        # defined in returned_expressions in _buildQuery() below, as the
-        # displayed price.
-        # elif expr.name == 'adjusted_price':
-          # price = expr.value
+    if len(search_results.results):
+      for doc in search_results:
+        # logging.info("doc: %s ", doc)
+        pdoc = docs.Product(doc)
+        # use the description field as the default description snippet, since
+        # snippeting is not supported on the dev app server.
+        description_snippet = pdoc.getDescription()
+        price = pdoc.getPrice()
+        # on the dev app server, the doc.expressions property won't be populated.
+        for expr in doc.expressions:
+          if expr.name == docs.Product.DESCRIPTION:
+            description_snippet = expr.value
+          # uncomment to use 'adjusted price', which should be
+          # defined in returned_expressions in _buildQuery() below, as the
+          # displayed price.
+          # elif expr.name == 'adjusted_price':
+            # price = expr.value
 
-      # get field information from the returned doc
-      pid = pdoc.getPID()
-      cat = catname = pdoc.getCategory()
-      pname = pdoc.getName()
-      avg_rating = pdoc.getAvgRating()
-      # for this result, generate a result array of selected doc fields, to
-      # pass to the template renderer
-      psearch_response.append(
-          [doc, urllib.quote_plus(pid), cat,
-           description_snippet, price, pname, catname, avg_rating])
+        # get field information from the returned doc
+        pid = pdoc.getPID()
+        cat = catname = pdoc.getCategory()
+        pname = pdoc.getName()
+        avg_rating = pdoc.getAvgRating()
+        # for this result, generate a result array of selected doc fields, to
+        # pass to the template renderer
+        psearch_response.append(
+            [doc, urllib.quote_plus(pid), cat,
+             description_snippet, price, pname, catname, avg_rating])
     if not query:
       print_query = 'All'
     else:
